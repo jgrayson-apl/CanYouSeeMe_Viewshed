@@ -2,15 +2,15 @@
 Using the ArcGIS Online Viewshed service to evaluate inter-visitbility.
 
 ## Demo
-[Can You See Me]()
+[Can You See Me](https://geoxc-apps2.bd.esri.com/Visibility/CanYouSeeMe_Viewshed/index.html)
 
 ## ArcGIS Elevation Analysis services
 * [Getting Started](https://developers.arcgis.com/rest/elevation/api-reference/get-started-with-elevation-services.htm)
 * [Viewshed](https://developers.arcgis.com/rest/elevation/api-reference/viewshed.htm)
 
 ## Geoprocessing Service
-* [Geoprocessing Service URL](https://elevation.arcgis.com/arcgis/rest/services/Tools/Elevation/GPServer/Viewshed)
-* [Geoprocessing Service DOC](https://elevation.arcgis.com/arcgis/rest/directories/arcgisoutput/Tools/Elevation_GPServer/Tools_Elevation/Viewshed.htm)
+* [GP service URL](https://elevation.arcgis.com/arcgis/rest/services/Tools/Elevation/GPServer/Viewshed)
+* [GP service DOC](https://elevation.arcgis.com/arcgis/rest/directories/arcgisoutput/Tools/Elevation_GPServer/Tools_Elevation/Viewshed.htm)
 
 
 ## Deploy

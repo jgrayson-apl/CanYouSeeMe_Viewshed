@@ -173,7 +173,6 @@ class Application extends AppBase {
       const surfaceOffsetInput = document.getElementById('surfaceOffsetInput');
       const overlapAreaInput = document.getElementById('overlap-area-input');
 
-
       const statusNotice = document.getElementById('status-notice');
       view.ui.add(statusNotice, 'top-right');
 
@@ -188,7 +187,7 @@ class Application extends AppBase {
         {name: "PerimeterKm", type: "double", alias: "Perimeter Kilometers", visible: true},
         {name: "AreaSqKm", type: "double", alias: "Area Square Kilometers", visible: true},
         {name: "Shape_Length", type: "double", alias: "Shape Length", visible: false},
-        {name: "Shape_Area", type: "double", alias: "Shape Area", visible: false},
+        {name: "Shape_Area", type: "double", alias: "Shape Area", visible: false}
       ];
 
       // FIELD INFOS //
@@ -207,8 +206,23 @@ class Application extends AppBase {
         return clr;
       };
 
+      const simpleResultRenderer = {
+        type: "simple",
+        symbol: {
+          type: "polygon-3d",
+          symbolLayers: [
+            {
+              type: "fill",
+              material: {color: getColor('red', 0.2)},
+              outline: {color: getColor('red', 0.5), size: 0.5}
+            }
+          ]
+        }
+      };
+
       // VIEWSHED LAYER //
       const viewshedResultsLayer = new FeatureLayer({
+        title: 'Viewshed Results',
         objectIdField: "OBJECTID",
         geometryType: "polygon",
         spatialReference: {wkid: 102100},
@@ -221,20 +235,64 @@ class Application extends AppBase {
             {type: "fields", fieldInfos: fieldInfos}
           ]
         },
-        renderer: {
-          type: "simple",
-          symbol: {
-            type: "polygon-3d",
-            symbolLayers: [
-              {
-                type: "fill",
-                material: {color: getColor('red', 0.2)},
-                outline: {color: getColor('red', 0.5), size: 0.5}
-              }
-            ]
-          }
-        }
+        opacity: 0.6,
+        renderer: simpleResultRenderer
       });
+
+      require(["esri/widgets/Legend"], (Legend) => {
+        let legend = new Legend({view: view, layerInfos: [{layer: viewshedResultsLayer}]});
+        view.ui.add(legend, "top-right");
+      });
+
+      const observerSketchOptions = document.getElementById('observer-sketch-options');
+
+      const resetResultsRenderer = () => {
+        viewshedResultsLayer.renderer = simpleResultRenderer;
+      };
+
+      const updateResultsRenderer = ({numClasses}) => {
+        return new Promise((resolve, reject) => {
+          require([
+            "esri/smartMapping/symbology/color",
+            "esri/smartMapping/renderers/color"
+          ], (colorSchemes, colorRendererCreator) => {
+
+            if (!numClasses || (observerSketchOptions.selectedItem.value === 'point')) {
+              viewshedResultsLayer.renderer = simpleResultRenderer;
+              resolve();
+
+            } else {
+
+              const colorScheme = colorSchemes.getSchemeByName({
+                view,
+                name: 'Orange 4',
+                geometryType: 'polygon',
+                theme: 'high-to-low'
+              });
+
+              colorRendererCreator.createContinuousRenderer({
+                view,
+                layer: viewshedResultsLayer,
+                field: 'Frequency',
+                theme: 'high-to-low',
+                classificationMethod: 'equal-interval',
+                numClasses: numClasses,
+                colorScheme,
+                defaultSymbolEnabled: false,
+                legendOptions: {title: 'Overlap Count'}
+              }).then((result) => {
+                //console.info(result.renderer);
+
+                result.renderer.classBreakInfos.forEach(cbInfo => cbInfo.symbol.outline.width === 0);
+
+                viewshedResultsLayer.renderer = result.renderer;
+                resolve();
+              });
+
+            }
+          });
+        });
+      };
 
       // OVERLAP LAYER //
       const overlappingAreasLayer = new FeatureLayer({
@@ -334,12 +392,14 @@ class Application extends AppBase {
           view.whenLayerView(observerLocationLayer).then(observerLocationLayerView => {
 
             clearViewshedsAction.addEventListener('click', () => {
+              clearViewshedsAction.toggleAttribute('disabled', true);
               viewshedList.replaceChildren();
               Promise.all([
                 clearOverlapGraphic(),
                 clearObserverGraphics(),
                 clearDistanceGraphics(),
-                clearViewshedResults()
+                clearViewshedResults(),
+                updateResultsRenderer({})
               ]).then(() => {
                 clearVisibilityFilters();
               });
@@ -349,10 +409,13 @@ class Application extends AppBase {
               viewshedList.getSelectedItems().then((selection) => {
                 const selectedObjectIDs = Array.from(selection.keys()).map(Number);
                 const objectIDs = [...selectedObjectIDs, ...newOIDs];
+
                 const filter = {where: `(OBJECTID IN (${ objectIDs.join(',') }))`};
                 viewshedResultsLayerView.filter = filter;
                 distanceBufferLayerView.filter = filter;
                 observerLocationLayerView.filter = filter;
+
+                clearViewshedsAction.toggleAttribute('disabled', !objectIDs.length);
               });
             };
 
@@ -360,7 +423,7 @@ class Application extends AppBase {
               viewshedResultsLayerView.filter = null;
               distanceBufferLayerView.filter = null;
               observerLocationLayerView.filter = null;
-            }
+            };
 
             // UPDATE OBSERVER GRAPHIC //
             const updateObserverGraphic = (location, offset) => {
@@ -372,7 +435,7 @@ class Application extends AppBase {
                   addFeatures.push({
                     geometry: observerLocation,
                     attributes: {offset: offset || 0.0}
-                  })
+                  });
                 }
                 observerLocationLayer.applyEdits({addFeatures: addFeatures}).then(applyEditResponse => {
                   const newOID = applyEditResponse.addFeatureResults[0].objectId;
@@ -418,12 +481,13 @@ class Application extends AppBase {
             };
 
             // UPDATE VIEWSHED RESULTS //
-            const updateViewshedResults = (viewshedFeature) => {
+            const updateViewshedResults = (viewshedFeatures = []) => {
               return new Promise((resolve, reject) => {
-                const addFeatures = (viewshedFeature != null) ? [viewshedFeature] : [];
-                viewshedResultsLayer.applyEdits({addFeatures: addFeatures}).then(() => {
-                  updateViewshedList(viewshedFeature);
-                  resolve();
+                viewshedResultsLayer.applyEdits({addFeatures: viewshedFeatures}).then(() => {
+                  updateResultsRenderer({numClasses: viewshedFeatures.length}).then(() => {
+                    viewshedFeatures.forEach(updateViewshedList);
+                    resolve();
+                  });
                 });
               });
             };
@@ -473,6 +537,10 @@ class Application extends AppBase {
               });
             };
 
+            const updateOverlapArea = (overlapAreaSqKm) => {
+              overlapAreaInput.value = areaFormatter.format(overlapAreaSqKm);
+            };
+
             const clearOverlapGraphic = () => {
               return new Promise((resolve, reject) => {
                 overlapAreaInput.value = 0.0;
@@ -512,7 +580,7 @@ class Application extends AppBase {
                   if (newOverlapArea) {
                     updateOverlapGraphic(newOverlapArea).then(resolve).catch(reject);
                   } else {
-                    clearOverlapGraphic().then(resolve).catch(reject)
+                    clearOverlapGraphic().then(resolve).catch(reject);
                   }
                 }).catch(reject);
               });
@@ -540,9 +608,10 @@ class Application extends AppBase {
               const demResolution = viewshedFeature.getAttribute('DEMResolution');
               const productName = viewshedFeature.getAttribute('ProductName');
               const source = viewshedFeature.getAttribute('Source');
+              const frequency = viewshedFeature.getAttribute('Frequency');
 
               listItem.setAttribute('label', `ID: ${ oid } | Area: ${ areaSqKM } SqKm`);
-              listItem.setAttribute('description', `Source: ${ demResolution } from '${ productName }' by ${ source }`);
+              listItem.setAttribute('description', `Overlaps: ${ frequency } | Source: ${ demResolution } from '${ productName }' by ${ source }`);
               listItem.setAttribute('value', oid);
               listItem.addEventListener('calciteListItemChange', ({}) => {
                 updateViewshedVisibility();
@@ -555,7 +624,7 @@ class Application extends AppBase {
               });
 
               viewshedList.append(listItem);
-            }
+            };
 
             //
             // JOB STATUS UPDATE //
@@ -597,23 +666,23 @@ class Application extends AppBase {
             const viewshed_service_url = "https://elevation.arcgis.com/arcgis/rest/services/Tools/Elevation/GPServer/Viewshed";
             esriConfig.request.trustedServers.push("https://elevation.arcgis.com");
 
-            const calcViewshed = (location) => {
+            const calcViewshed = (locations) => {
               return new Promise((resolve, reject) => {
 
                 // INPUT LOCATIONS //
                 //  - NOTE: MAKE SURE THERE ARE NO Z VALUES SET IN THE GEOMETRY //
                 const input_points = new FeatureSet({
-                  features: [
-                    new Graphic({
+                  features: locations.map(location => {
+                    return new Graphic({
                       geometry: {
                         type: "point",
                         spatialReference: location.spatialReference,
                         hasZ: false,
                         x: location.x,
-                        y: location.y,
+                        y: location.y
                       }
-                    })
-                  ]
+                    });
+                  })
                 });
 
                 //
@@ -656,14 +725,25 @@ class Application extends AppBase {
                     // GET RESULTS //
                     jobInfo.fetchResultData('OutputViewshed', resultOptions).then(({value}) => {
                       // VIEWSHED FEATURE //
-                      const viewshedFeature = value.features[0];
+                      const viewshedFeatures = value.features;
+
+                      if (viewshedFeatures.length === 1) {
+                        const viewshedFeature = viewshedFeatures[0];
+
+                        // UPDATE VIEWSHED RESULTS //
+                        calculateOverlapArea(viewshedFeature.geometry).then(() => {
+                          updateViewshedResults([viewshedFeature]).then(resolve).catch(reject);
+                        }).catch(reject);
+
+                      } else {
+                        updateViewshedResults(viewshedFeatures).then(resolve).catch(reject);
+                      }
 
                       // UPDATE VIEWSHED RESULTS //
-                      calculateOverlapArea(viewshedFeature.geometry).then(() => {
+                      // calculateOverlapArea(viewshedFeature.geometry).then(() => {
+                      //   updateViewshedResults(viewshedFeature).then(resolve).catch(reject);
+                      // }).catch(reject);
 
-                        updateViewshedResults(viewshedFeature).then(resolve).catch(reject)
-
-                      }).catch(reject);
                     }).catch(reject);
                   }).catch(reject);
                 }).catch(reject);
@@ -671,30 +751,96 @@ class Application extends AppBase {
               });
             };
 
-            view.container.style.cursor = 'crosshair';
-            view.on("click", (evt) => {
-              evt.stopPropagation();
+            const updateObserver = (location) => {
+              return new Promise((resolve, reject) => {
 
-              updateObserverGraphic(evt.mapPoint, Number(observerHeightInput.value)).then((newOID) => {
-                updateViewshedVisibility([newOID]);
+                updateObserverGraphic(location, Number(observerHeightInput.value)).then((newOID) => {
+                  updateViewshedVisibility([newOID]);
+                });
+
+                const analysisLocation = location.clone();
+                analysisLocation.hasZ = false;
+                let viewshedBuffer = geometryEngine.geodesicBuffer(analysisLocation, Number(maximumDistanceInput.value), "meters");
+                updateDistanceGraphic(viewshedBuffer);
+
+                view.container.style.cursor = "wait";
+                jobStatusUpdate({jobStatus: "job-new"});
+
+                statusNotice.toggleAttribute('active', true);
+                calcViewshed([location]).then(() => {
+
+                  jobStatusUpdate({jobStatus: "job-succeeded"});
+                  statusNotice.toggleAttribute('active', false);
+
+                  resolve();
+                }).catch(reject);
+              });
+            };
+
+            const observerDistanceSlider = document.getElementById('observer-distance-slider');
+            observerDistanceSlider.value;
+
+            const updateObservers = (polyline) => {
+              return new Promise((resolve, reject) => {
+
+                const distanceAlong = observerDistanceSlider.value;
+                const analysisPolyline = geometryEngine.geodesicDensify(polyline, distanceAlong, 'meters');
+                //const analysisPolyline = polyline.clone();
+
+                const observers = analysisPolyline.paths[0].map((coords, coordsIdx) => {
+                  const pnt = analysisPolyline.getPoint(0, coordsIdx);
+                  pnt.hasZ = false;
+                  return pnt;
+                });
+
+                let viewshedBuffer = geometryEngine.geodesicBuffer(observers, [Number(maximumDistanceInput.value)], "meters", true)[0];
+                updateDistanceGraphic(viewshedBuffer);
+
+                view.container.style.cursor = "wait";
+                jobStatusUpdate({jobStatus: "job-new"});
+
+                statusNotice.toggleAttribute('active', true);
+                calcViewshed(observers).then(() => {
+
+                  jobStatusUpdate({jobStatus: "job-succeeded"});
+                  statusNotice.toggleAttribute('active', false);
+
+                  resolve();
+                }).catch(reject);
+
+              });
+            };
+
+            require(["esri/widgets/Sketch/SketchViewModel"], (SketchViewModel) => {
+
+              const sketchLayer = new GraphicsLayer({title: 'Sketch Layer'});
+              view.map.add(sketchLayer);
+
+              const sketchVM = new SketchViewModel({
+                view: view,
+                layer: sketchLayer
+              });
+              sketchVM.on('create', createEvt => {
+                if (createEvt.state === "complete") {
+                  sketchLayer.remove(createEvt.graphic);
+                  if (createEvt.tool === 'point') {
+                    updateObserver(createEvt.graphic.geometry).then(() => {
+                      sketchVM.create(createEvt.tool);
+                    });
+                  } else {
+                    updateObservers(createEvt.graphic.geometry).then(() => {
+                      sketchVM.create(createEvt.tool);
+                    });
+                  }
+                }
+              });
+              sketchVM.create('point');
+
+              observerSketchOptions.addEventListener('calciteRadioGroupChange', () => {
+                const selectedSketchOption = observerSketchOptions.selectedItem.value;
+                sketchVM.create(selectedSketchOption);
               });
 
-              const analysisLocation = evt.mapPoint.clone();
-              analysisLocation.hasZ = false;
-              let viewshedBuffer = geometryEngine.geodesicBuffer(analysisLocation, Number(maximumDistanceInput.value), "meters");
-              updateDistanceGraphic(viewshedBuffer);
-
-              view.container.style.cursor = "wait";
-              jobStatusUpdate({jobStatus: "job-new"});
-
-              statusNotice.toggleAttribute('active', true);
-              calcViewshed(evt.mapPoint).then(() => {
-
-                view.container.style.cursor = "crosshair";
-                jobStatusUpdate({jobStatus: "job-succeeded"});
-                statusNotice.toggleAttribute('active', false);
-
-              }).catch(displayError);
             });
           });
         });

@@ -1,0 +1,52 @@
+<!--<div class="panel-content">
+          <h4>ArcGIS Elevation Analysis services</h4>
+          <ul>
+            <li>
+              <a href="https://developers.arcgis.com/rest/elevation/api-reference/get-started-with-elevation-services.htm" target="_blank">Getting Started</a>
+            </li>
+            <li>
+              <a href="https://developers.arcgis.com/rest/elevation/api-reference/viewshed.htm" target="_blank">Viewshed</a>
+            </li>
+          </ul>
+          <h4>Geoprocessing Service</h4>
+          <ul>
+            <li>
+              <a href="https://elevation.arcgis.com/arcgis/rest/services/Tools/Elevation/GPServer/Viewshed" target="_blank">GP Service URL</a>
+            </li>
+            <li>
+              <a href="https://elevation.arcgis.com/arcgis/rest/directories/arcgisoutput/Tools/Elevation_GPServer/Tools_Elevation/Viewshed.htm" target="_blank">GP Service DOC</a>
+            </li>
+          </ul>
+        </div>
+        <div class="panel-content">
+          <h4>Details</h4>
+          <ul>
+            <li>
+              There are several elevation sources currently available which are at different spatial resolutions and cover different areas. Not all resolutions are available for all areas. The service will return an error message if the specified resolution is not available at any of the input observer locations.
+            </li>
+            <li>
+              If the DEM Resolution parameter is empty or not supplied, then the coarsest resolution (90m) will be used. If FINEST is specified, then the service will use the smallest resolution available at your observer location allowed by the maximum distance parameter.
+            </li>
+            <li>
+              For the MaximumDistance parameter itself, the allowed value for the 10m and 30m DEM resolutions is 15 kilometers or less. For the 90m DEM resolution, the allowed value is 50 kilometers or less. If this parameter is not specified, the task will use a default value based on the DEM resolution parameter. For 10m resolution, the default maximum distance is 5 kilometers. For both the 30m and the 90m DEM resolutions, the default distance is 15 kilometers.
+            </li>
+            <li>
+              The service uses a single resolution elevation source for the input features. The entire input features must fit into a single resolution, or else the service will pick the highest resolution which can cover the input features.
+            </li>
+            <li>
+              Visibility into water is limited, so the tool uses the water surface as the elevation service. Oceans have been assigned a value of zero and major water bodies have been assigned an appropriate flat local elevation.
+            </li>
+            <li>
+              The output viewshed is returned as polygon features. The field named "Frequency" is used to record the number of observation points that can see each polygon. The field named "DEMResolution" is used to record the source DEM resolution for the viewshed computation.
+            </li>
+            <li>
+              A lower DEM resolution will result in a faster response from the service. For example, the 90m resolution has the shortest response time from the service. The tradeoff is that a lower DEM resolution has a lower accuracy in the viewshed result compared to that of a higher DEM resolution.
+            </li>
+            <li>
+              The Maximum Distance parameter may also affect the Viewshed service response time. In general, using a smaller distance results in a shorter response time.
+            </li>
+            <li>
+              The maximum number of input points is 1000. If more input points are provided, the service will return an error and will not execute.
+            </li>
+          </ul>
+        </div>-->

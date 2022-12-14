@@ -106,15 +106,17 @@ class AppLoader extends Watchable {
 
             }
 
+            // AUTHENTICAITON MODE //
+            let authMode = 'immediate';
+
             // CHECK SIGNIN STATUS //
             esriId.checkSignInStatus(portalSharingURL).then(() => {
-              esriId.getCredential(portalSharingURL);
+              return esriId.getCredential(portalSharingURL);
             }).catch(() => {
               /* ... */
             }).then(() => {
               // LOAD PORTAL //
-              // authMode: 'immediate'
-              this._loadPortal().then(() => {
+              this._loadPortal({authMode}).then(() => {
                 resolve(signInMessage);
               }).catch(reject);
             });

@@ -85,7 +85,6 @@ class Application extends AppBase {
           // CONFIGURE VIEW SPECIFIC STUFF HERE //
           //
           view.set({
-            constraints: {snapToZoom: false},
             qualityProfile: "high"
           });
 
@@ -93,32 +92,16 @@ class Application extends AppBase {
           const home = new Home({view});
           view.ui.add(home, {position: 'top-left', index: 0});
 
-          // LEGEND //
-          /*
-           const legend = new Legend({ view: view });
-           view.ui.add(legend, {position: 'bottom-left', index: 0});
-           */
-
           // SEARCH /
           const search = new Search({view: view});
           view.ui.add(search, {position: 'top-left', index: 0});
 
-          // LAYER LIST //
-          /*const layerList = new LayerList({
-           container: 'layer-list-container',
-           view: view,
-           listItemCreatedFunction: (event) => {
-           event.item.open = (event.item.layer.type === 'group');
-           },
-           visibleElements: {statusIndicators: true}
-           });*/
-
           // VIEW UPDATING //
-          const viewUpdating = document.getElementById('view-updating');
+          /*const viewUpdating = document.getElementById('view-updating');
           view.ui.add(viewUpdating, 'bottom-right');
           this._watchUtils.init(view, 'updating', updating => {
             viewUpdating.toggleAttribute('active', updating);
-          });
+          });*/
 
           resolve();
         });
@@ -244,56 +227,6 @@ class Application extends AppBase {
         view.ui.add(legend, "top-right");
       });
 
-      const observerSketchOptions = document.getElementById('observer-sketch-options');
-
-      const resetResultsRenderer = () => {
-        viewshedResultsLayer.renderer = simpleResultRenderer;
-      };
-
-      const updateResultsRenderer = ({numClasses}) => {
-        return new Promise((resolve, reject) => {
-          require([
-            "esri/smartMapping/symbology/color",
-            "esri/smartMapping/renderers/color"
-          ], (colorSchemes, colorRendererCreator) => {
-
-            if (!numClasses || (observerSketchOptions.selectedItem.value === 'point')) {
-              viewshedResultsLayer.renderer = simpleResultRenderer;
-              resolve();
-
-            } else {
-
-              const colorScheme = colorSchemes.getSchemeByName({
-                view,
-                name: 'Orange 4',
-                geometryType: 'polygon',
-                theme: 'high-to-low'
-              });
-
-              colorRendererCreator.createContinuousRenderer({
-                view,
-                layer: viewshedResultsLayer,
-                field: 'Frequency',
-                theme: 'high-to-low',
-                classificationMethod: 'equal-interval',
-                numClasses: numClasses,
-                colorScheme,
-                defaultSymbolEnabled: false,
-                legendOptions: {title: 'Overlap Count'}
-              }).then((result) => {
-                //console.info(result.renderer);
-
-                result.renderer.classBreakInfos.forEach(cbInfo => cbInfo.symbol.outline.width === 0);
-
-                viewshedResultsLayer.renderer = result.renderer;
-                resolve();
-              });
-
-            }
-          });
-        });
-      };
-
       // OVERLAP LAYER //
       const overlappingAreasLayer = new FeatureLayer({
         fields: [{name: "OBJECTID", type: "oid", alias: "OBJECTID"}],
@@ -398,8 +331,7 @@ class Application extends AppBase {
                 clearOverlapGraphic(),
                 clearObserverGraphics(),
                 clearDistanceGraphics(),
-                clearViewshedResults(),
-                updateResultsRenderer({})
+                clearViewshedResults()
               ]).then(() => {
                 clearVisibilityFilters();
               });
@@ -484,10 +416,8 @@ class Application extends AppBase {
             const updateViewshedResults = (viewshedFeatures = []) => {
               return new Promise((resolve, reject) => {
                 viewshedResultsLayer.applyEdits({addFeatures: viewshedFeatures}).then(() => {
-                  updateResultsRenderer({numClasses: viewshedFeatures.length}).then(() => {
-                    viewshedFeatures.forEach(updateViewshedList);
-                    resolve();
-                  });
+                  viewshedFeatures.forEach(updateViewshedList);
+                  resolve();
                 });
               });
             };
@@ -512,8 +442,9 @@ class Application extends AppBase {
                 clearDistanceGraphics(removeOID),
                 clearObserverGraphics(removeOID)
               ]).then(() => {
-                resetOverlapArea();
-                updateViewshedVisibility();
+                resetOverlapArea().then(() => {
+                  updateViewshedVisibility();
+                });
               });
             };
 
@@ -522,11 +453,13 @@ class Application extends AppBase {
               return new Promise((resolve, reject) => {
                 const addFeatures = (overlapArea) ? [{geometry: overlapArea}] : [];
                 overlappingAreasLayer.queryFeatures().then(overlapFS => {
+
                   if ((addFeatures.length > 0) || (overlapFS.features.length > 0)) {
                     overlappingAreasLayer.applyEdits({addFeatures: addFeatures, deleteFeatures: overlapFS.features}).then(applyEditResponse => {
-                      //const newOID = applyEditResponse.addFeatureResults[0].objectId;
+
                       const overlapAreaSqKm = geometryEngine.geodesicArea(overlapArea, 'square-kilometers');
                       overlapAreaInput.value = areaFormatter.format(overlapAreaSqKm);
+
                       resolve();
                     }).catch(reject);
                   } else {
@@ -558,7 +491,7 @@ class Application extends AppBase {
                   let newOverlapArea;
                   if (overlapFS.features.length > 0) {
                     const previousOverlapArea = overlapFS.features[0].geometry;
-                    newOverlapArea = geometryEngine.intersect(previousOverlapArea, newViewshedPolygon);
+                    newOverlapArea = geometryEngine.intersect(previousOverlapArea, newViewshedPolygon) || previousOverlapArea;
                   } else {
                     newOverlapArea = newViewshedPolygon.clone();
                   }
@@ -777,40 +710,6 @@ class Application extends AppBase {
               });
             };
 
-            const observerDistanceSlider = document.getElementById('observer-distance-slider');
-            observerDistanceSlider.value;
-
-            const updateObservers = (polyline) => {
-              return new Promise((resolve, reject) => {
-
-                const distanceAlong = observerDistanceSlider.value;
-                const analysisPolyline = geometryEngine.geodesicDensify(polyline, distanceAlong, 'meters');
-                //const analysisPolyline = polyline.clone();
-
-                const observers = analysisPolyline.paths[0].map((coords, coordsIdx) => {
-                  const pnt = analysisPolyline.getPoint(0, coordsIdx);
-                  pnt.hasZ = false;
-                  return pnt;
-                });
-
-                let viewshedBuffer = geometryEngine.geodesicBuffer(observers, [Number(maximumDistanceInput.value)], "meters", true)[0];
-                updateDistanceGraphic(viewshedBuffer);
-
-                view.container.style.cursor = "wait";
-                jobStatusUpdate({jobStatus: "job-new"});
-
-                statusNotice.toggleAttribute('active', true);
-                calcViewshed(observers).then(() => {
-
-                  jobStatusUpdate({jobStatus: "job-succeeded"});
-                  statusNotice.toggleAttribute('active', false);
-
-                  resolve();
-                }).catch(reject);
-
-              });
-            };
-
             require(["esri/widgets/Sketch/SketchViewModel"], (SketchViewModel) => {
 
               const sketchLayer = new GraphicsLayer({title: 'Sketch Layer'});
@@ -823,22 +722,22 @@ class Application extends AppBase {
               sketchVM.on('create', createEvt => {
                 if (createEvt.state === "complete") {
                   sketchLayer.remove(createEvt.graphic);
-                  if (createEvt.tool === 'point') {
-                    updateObserver(createEvt.graphic.geometry).then(() => {
-                      sketchVM.create(createEvt.tool);
-                    });
-                  } else {
-                    updateObservers(createEvt.graphic.geometry).then(() => {
-                      sketchVM.create(createEvt.tool);
-                    });
-                  }
+                  updateObserver(createEvt.graphic.geometry).then(() => {
+                    sketchVM.create(createEvt.tool);
+                  });
                 }
               });
-              sketchVM.create('point');
 
-              observerSketchOptions.addEventListener('calciteRadioGroupChange', () => {
-                const selectedSketchOption = observerSketchOptions.selectedItem.value;
-                sketchVM.create(selectedSketchOption);
+              const setObserverLocationBtn = document.getElementById('set-observer-location-btn');
+              setObserverLocationBtn.addEventListener('click', () => {
+                const active = setObserverLocationBtn.toggleAttribute('active');
+                setObserverLocationBtn.setAttribute('icon-end', active ? 'check' : 'blank');
+                setObserverLocationBtn.setAttribute('appearance', active ? 'solid' : 'outline');
+                if (active) {
+                  sketchVM.create('point');
+                } else {
+                  sketchVM.cancel();
+                }
               });
 
             });

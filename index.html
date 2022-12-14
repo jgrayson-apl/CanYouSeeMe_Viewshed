@@ -82,7 +82,7 @@
             <div id="options-panel" class="panel-content content-static">
               <calcite-label layout="inline-space-between" title="The maximum distance to calculate the viewshed">
                 <div>Maximum Distance</div>
-                <calcite-input id="maximumDistanceInput" icon="measure" type="number" alignment="end" min="100.0" max="5000.0" value="1000.0" step="100.0"></calcite-input>
+                <calcite-input id="maximumDistanceInput" icon="measure" type="number" alignment="end" min="100" max="5000" value="1500" step="100"></calcite-input>
                 <div>meters</div>
               </calcite-label>
               <calcite-label layout="inline-space-between" title="The height above the surface of the observer. The default value of 1.75 meters is an average height of a person. If you are looking from an elevated location such as an observation tower or a tall building, use that height instead">
@@ -95,21 +95,12 @@
                 <calcite-input id="surfaceOffsetInput" icon="altitude" type="number" alignment="end" min="1.0" max="50.0" value="10.0" step="1.0"></calcite-input>
                 <div>meters</div>
               </calcite-label>
-              <calcite-label title="The distance between observers along the line">
-                <div>Distance Along Line (meters)</div>
-                <calcite-slider id="observer-distance-slider" min="50" max="250" value="100" ticks="50" step="25" snap label-ticks label-handles></calcite-slider>
-              </calcite-label>
             </div>
             
             <div class="content-fill leader-m">
-              
               <div class="margin-m">
-                <calcite-radio-group id="observer-sketch-options" width="full">
-                  <calcite-radio-group-item value="point" checked>observers at locations</calcite-radio-group-item>
-                  <calcite-radio-group-item value="polyline">observer locations along line</calcite-radio-group-item>
-                </calcite-radio-group>
+                <calcite-button id="set-observer-location-btn" appearance="outline" icon-start="point" icon-end="blank" width="full">set observer location</calcite-button>
               </div>
-              
               <calcite-pick-list id="viewshed-list" multiple></calcite-pick-list>
               <div class="margin-m">
                 <calcite-button id="clear-viewsheds-action" color="red" appearance="outline" icon-end="trash" width="full" disabled>clear viewsheds</calcite-button>

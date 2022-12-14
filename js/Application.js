@@ -98,10 +98,10 @@ class Application extends AppBase {
 
           // VIEW UPDATING //
           /*const viewUpdating = document.getElementById('view-updating');
-          view.ui.add(viewUpdating, 'bottom-right');
-          this._watchUtils.init(view, 'updating', updating => {
-            viewUpdating.toggleAttribute('active', updating);
-          });*/
+           view.ui.add(viewUpdating, 'bottom-right');
+           this._watchUtils.init(view, 'updating', updating => {
+           viewUpdating.toggleAttribute('active', updating);
+           });*/
 
           resolve();
         });
@@ -453,30 +453,33 @@ class Application extends AppBase {
               return new Promise((resolve, reject) => {
                 const addFeatures = (overlapArea) ? [{geometry: overlapArea}] : [];
                 overlappingAreasLayer.queryFeatures().then(overlapFS => {
-
                   if ((addFeatures.length > 0) || (overlapFS.features.length > 0)) {
                     overlappingAreasLayer.applyEdits({addFeatures: addFeatures, deleteFeatures: overlapFS.features}).then(applyEditResponse => {
-
-                      const overlapAreaSqKm = geometryEngine.geodesicArea(overlapArea, 'square-kilometers');
-                      overlapAreaInput.value = areaFormatter.format(overlapAreaSqKm);
-
+                      if (overlapArea) {
+                        const overlapAreaSqKm = geometryEngine.geodesicArea(overlapArea, 'square-kilometers');
+                        setOverlapAreaInput(areaFormatter.format(overlapAreaSqKm));
+                      } else {
+                        setOverlapAreaInput();
+                      }
                       resolve();
                     }).catch(reject);
                   } else {
-                    overlapAreaInput.value = 0.0;
+                    setOverlapAreaInput();
                     resolve();
                   }
                 }).catch(reject);
               });
             };
 
-            const updateOverlapArea = (overlapAreaSqKm) => {
-              overlapAreaInput.value = areaFormatter.format(overlapAreaSqKm);
+            const setOverlapAreaInput = (overlapAreaSqKm) => {
+              overlapAreaInput.value = overlapAreaSqKm || 0.0;
+              overlapAreaInput.setAttribute('status', overlapAreaSqKm ? 'valid' : 'invalid');
             };
 
             const clearOverlapGraphic = () => {
               return new Promise((resolve, reject) => {
-                overlapAreaInput.value = 0.0;
+                setOverlapAreaInput();
+
                 overlappingAreasLayer.queryFeatures().then(overlapFS => {
                   if (overlapFS.features.length > 0) {
                     overlappingAreasLayer.applyEdits({deleteFeatures: overlapFS.features}).then(resolve).catch(reject);
@@ -491,7 +494,7 @@ class Application extends AppBase {
                   let newOverlapArea;
                   if (overlapFS.features.length > 0) {
                     const previousOverlapArea = overlapFS.features[0].geometry;
-                    newOverlapArea = geometryEngine.intersect(previousOverlapArea, newViewshedPolygon) || previousOverlapArea;
+                    newOverlapArea = geometryEngine.intersect(previousOverlapArea, newViewshedPolygon);
                   } else {
                     newOverlapArea = newViewshedPolygon.clone();
                   }
@@ -671,12 +674,6 @@ class Application extends AppBase {
                       } else {
                         updateViewshedResults(viewshedFeatures).then(resolve).catch(reject);
                       }
-
-                      // UPDATE VIEWSHED RESULTS //
-                      // calculateOverlapArea(viewshedFeature.geometry).then(() => {
-                      //   updateViewshedResults(viewshedFeature).then(resolve).catch(reject);
-                      // }).catch(reject);
-
                     }).catch(reject);
                   }).catch(reject);
                 }).catch(reject);
@@ -701,6 +698,7 @@ class Application extends AppBase {
 
                 statusNotice.toggleAttribute('active', true);
                 calcViewshed([location]).then(() => {
+                  view.container.style.cursor = "default";
 
                   jobStatusUpdate({jobStatus: "job-succeeded"});
                   statusNotice.toggleAttribute('active', false);

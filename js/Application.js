@@ -155,6 +155,7 @@ class Application extends AppBase {
       const observerHeightInput = document.getElementById('observerHeightInput');
       const surfaceOffsetInput = document.getElementById('surfaceOffsetInput');
       const overlapAreaInput = document.getElementById('overlap-area-input');
+      const overlapAreaMessage = document.getElementById('overlap-area-message');
 
       const statusNotice = document.getElementById('status-notice');
       view.ui.add(statusNotice, 'top-right');
@@ -471,9 +472,13 @@ class Application extends AppBase {
               });
             };
 
-            const setOverlapAreaInput = (overlapAreaSqKm) => {
-              overlapAreaInput.value = overlapAreaSqKm || 0.0;
-              overlapAreaInput.setAttribute('status', overlapAreaSqKm ? 'valid' : 'invalid');
+            const setOverlapAreaInput = (overlapArea) => {
+              overlapAreaInput.value = overlapArea || 0.0;
+
+              const observerCount = viewshedList.querySelectorAll('calcite-pick-list-item').length;
+              const isInvalid = (overlapArea == null) && (observerCount > 0);
+              overlapAreaInput.setAttribute('status', isInvalid ? 'invalid' : 'valid');
+              overlapAreaMessage.toggleAttribute('active', isInvalid);
             };
 
             const clearOverlapGraphic = () => {
@@ -544,10 +549,10 @@ class Application extends AppBase {
               const demResolution = viewshedFeature.getAttribute('DEMResolution');
               const productName = viewshedFeature.getAttribute('ProductName');
               const source = viewshedFeature.getAttribute('Source');
-              const frequency = viewshedFeature.getAttribute('Frequency');
+              //const frequency = viewshedFeature.getAttribute('Frequency');
 
               listItem.setAttribute('label', `ID: ${ oid } | Area: ${ areaSqKM } SqKm`);
-              listItem.setAttribute('description', `Overlaps: ${ frequency } | Source: ${ demResolution } from '${ productName }' by ${ source }`);
+              listItem.setAttribute('description', `Source: ${ demResolution } from '${ productName }' by ${ source }`);
               listItem.setAttribute('value', oid);
               listItem.addEventListener('calciteListItemChange', ({}) => {
                 updateViewshedVisibility();

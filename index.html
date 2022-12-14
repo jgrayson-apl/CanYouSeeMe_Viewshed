@@ -70,9 +70,12 @@
             <div id="overlap-panel" class="panel-content content-static">
               <calcite-label layout="inline-space-between">
                 <div>Overlap Area</div>
-                <calcite-input id="overlap-area-input" icon="preserve" type="text" alignment="end" value="0.0" status="invalid" read-only></calcite-input>
+                <calcite-input id="overlap-area-input" icon="preserve" type="text" alignment="end" value="0.0" read-only></calcite-input>
                 <div>&nbsp;&nbsp;km<sup>2</sup>&nbsp;&nbsp;</div>
               </calcite-label>
+              <div class="content-center margin-m">
+                <calcite-input-message id="overlap-area-message" icon="exclamation-mark-triangle" status="invalid">there are NO visible overlap areas from all observers...</calcite-input-message>
+              </div>
             </div>
             <!--
               DEMResolution
@@ -109,7 +112,7 @@
           
           </div>
         </calcite-panel>
-        
+      
       </calcite-shell-panel>
       
       <!-- CENTER -->
